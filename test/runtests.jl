@@ -27,4 +27,9 @@ using Test
         x::Int
         y::Vector{Any}
     end
+
+    @test_skip @test_throws ErrorException @check_concrete struct J{T}
+        x::Int
+        y::Vector{T}
+    end
 end
