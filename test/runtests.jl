@@ -22,4 +22,9 @@ using Test
         x::Int
         y::Real
     end
+
+    @test_skip @test_throws ErrorException @check_concrete struct I
+        x::Int
+        y::Vector{Any}
+    end
 end
