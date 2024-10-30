@@ -58,3 +58,28 @@ end
 @check_concrete struct V52{T1}
     x::Union{T1, Int, Float64}
 end
+
+@check_concrete mutable struct V53{T1}
+    const x::T1
+    y::Vector{Any}
+end
+
+@check_concrete Base.@kwdef mutable struct V54{T1}
+    const x::T1
+    y::Vector{Any} = []
+    const z::Int = 3
+end
+
+@test V54{Int}(; x = 2) isa V54
+@test isconst(V54, :x)
+
+"Struct definition."
+Base.@kwdef @check_concrete mutable struct V55{T1}
+    const x::T1
+    y::Vector{Any} = []
+    const z::Int = 3
+end
+
+@test V55{Int}(; x = 2) isa V55
+@test isconst(V55, :x)
+@test "Struct definition.\n" == string(@eval @doc V55)

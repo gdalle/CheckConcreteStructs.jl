@@ -93,31 +93,44 @@ The following definitions will execute without error:
         x::V
     end
 """
-macro check_concrete(struct_def::Expr)
-    @assert isexpr(struct_def, :struct)
+macro check_concrete(ex::Expr)
+    if isexpr(ex, :macrocall)
+        i = findfirst(x -> isexpr(x, :struct), ex.args)
+        isnothing(i) && throw(ArgumentError("Expected `struct` definition, got $ex"))
+        struct_def = ex.args[i]
+    else
+        struct_def = ex
+    end
+    isexpr(struct_def, :struct) || throw(ArgumentError("Expected `struct` definition, got $struct_def"))
     struct_name = get_struct_name(struct_def)
     block = struct_def.args[3]
     @assert isexpr(block, :block)
+    # Make a first pass to have all fields annotated (no annotation is treated as ::Any)
+    # This will make our lifes easier for the actual processing.
     for (i, arg) in enumerate(block.args)
-        isexpr(arg, :(::)) || isa(arg, Symbol) || continue
-        if isa(arg, Symbol)
-            field_name, field_type, instant_err = arg, :Any, true
-        else
-            field_name, field_type, instant_err = arg.args[1], arg.args[2], false
-        end
+        parent = block
+        isexpr(arg, :const) && ((arg, parent, i) = (arg.args[1], arg, 1))
+        isexpr(arg, :(=)) && ((arg, parent, i) = (arg.args[1], arg, 1))
+        isexpr(arg, :(::)) && continue
+        isa(arg, Symbol) && (parent.args[i] = :($arg::Any))
+    end
+    for (i, arg) in enumerate(block.args)
+        isexpr(arg, :const) && (arg = arg.args[1])
+        isexpr(arg, :(=)) && (arg = arg.args[1])
+        isexpr(arg, :(::)) || continue
+        field_name, field_type = arg.args[1], arg.args[2]
         new_field_type = :($check_concrete_field(
             $field_type,
             $(QuoteNode(field_name)),
             $(QuoteNode(struct_name)),
-            $instant_err,
         ))
-        block.args[i] = Expr(:(::), field_name, new_field_type)
+        arg.args[2] = new_field_type
     end
-    return esc(struct_def)
+    return esc(ex)
 end
 
-function check_concrete_field(field_type, field_name, struct_name, instant_err)
-    if instant_err || !recursive_isconcretetype(field_type)
+function check_concrete_field(field_type, field_name, struct_name)
+    if !recursive_isconcretetype(field_type)
         throw(AbstractFieldError(struct_name, field_name, field_type))
     else
         return field_type
