@@ -129,7 +129,14 @@ function recursive_isconcretetype(T)
     isa(T, TypeVar) && return true  # key modification
     isconcretetype(T) && return true
     isabstracttype(T) && return false
-    for subT in fieldtypes(T)
+    if isa(T, Union)
+        subTs = Base.uniontypes(T)
+        # If inference will give up on this union, report as `false`.
+        length(subTs) > Core.Compiler.MAX_TYPEUNION_LENGTH && return false
+    else
+        subTs = fieldtypes(T)
+    end
+    for subT in subTs
         recursive_isconcretetype(subT) || return false
     end
     return true

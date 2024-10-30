@@ -53,3 +53,7 @@ end
     x::Int
     y::Tuple{T1,Array{T2}}
 end
+
+@test_throws AbstractFieldError @check_concrete struct I24{T1}
+    x::Union{T1, Int, Float32, Float64}
+end

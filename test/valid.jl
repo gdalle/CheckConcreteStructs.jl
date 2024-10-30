@@ -50,3 +50,11 @@ end
     y::Vector{T2}
     z::Vector{Tuple{T2,Int}}
 end
+
+@check_concrete struct V51{T1}
+    x::Union{T1, Int}
+end
+
+@check_concrete struct V52{T1}
+    x::Union{T1, Int, Float64}
+end
