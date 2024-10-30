@@ -15,25 +15,45 @@ function get_struct_name(expr::Expr)
     return struct_def
 end
 
-getfield_stable(x, ::Val{i}) where i = getfield(x, i)
-
 macro check_concrete(expr::Expr)
     @assert expr.head == :struct
     S = get_struct_name(expr)
-    return quote
-        $(esc(expr))
-        
-        for (i, n) in enumerate(fieldnames($(esc(S))))
-            vi = Val(i)
-            ts = Base.return_types(s -> getfield_stable(s, vi), ($(esc(S)),))
-            t = only(ts)
-            if !isconcretetype(t)
-                error("Field $n is not concrete ($t)")
-            end
+    block = expr.args[3]
+    for (i, arg) in enumerate(block.args)
+        Meta.isexpr(arg, :(::)) || isa(arg, Symbol) || continue
+        if isa(arg, Symbol)
+            block.args[i] = :(throw($TypeNotConcreteError($(QuoteNode(arg)), Any)))
+        else
+            name, type = (arg.args[1], arg.args[2])
+            block.args[i] = Expr(:(::), name, :($check_is_concretetype($type, $(QuoteNode(name)))))
         end
     end
+    esc(expr)
 end
 
-export @check_concrete
+struct TypeNotConcreteError <: Exception
+    field::Symbol
+    type::Type
+end
+
+Base.showerror(io::IO, exc::TypeNotConcreteError) = print(io, "TypeNotConcreteError: field ", exc.field, " with declared type ", exc.type, " is not concretely typed")
+
+function check_is_concretetype(T, name)
+    isconcretetype_with_typevar(T) || throw(TypeNotConcreteError(name, T))
+    T
+end
+
+function isconcretetype_with_typevar(T::Type)
+    isa(T, UnionAll) && return false
+    isa(T, TypeVar) && return true
+    isconcretetype(T) && return true
+    isabstracttype(T) && return false
+    for subT in fieldtypes(T)
+        isconcretetype_with_typevar(subT) || return false
+    end
+    true
+end
+
+export @check_concrete, TypeNotConcreteError
 
 end # module CheckConcreteStructs
