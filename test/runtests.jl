@@ -1,35 +1,25 @@
+using Aqua
 using CheckConcreteStructs
 using Test
 
 @testset verbose = true "CheckConcreteStructs" begin
-    @check_concrete struct A end
-    @check_concrete struct B <: AbstractVector{Int} end
-    @check_concrete struct C{T} <: AbstractVector{T} end
-
-    @test_throws TypeNotConcreteError @check_concrete struct D
-        x
-    end
-    @test_throws TypeNotConcreteError @check_concrete struct E
-        x::Vector
-    end
-    @test_throws TypeNotConcreteError @check_concrete struct F
-        x::Vector{<:Real}
-    end
-    @test_throws TypeNotConcreteError @check_concrete struct G{T}
-        x::AbstractVector{T}
-    end
-    @test_throws TypeNotConcreteError @check_concrete struct H
-        x::Int
-        y::Real
+    @testset "Formalities" begin
+        Aqua.test_all(CheckConcreteStructs)
     end
 
-    @check_concrete struct I
-        x::Int
-        y::Vector{Any}
+    @testset "Valid structs" begin
+        include("valid.jl")
     end
 
-    @check_concrete struct J{T}
-        x::Int
-        y::Vector{T}
+    @testset "Invalid structs" begin
+        include("invalid.jl")
+    end
+
+    @testset "Error display" begin
+        err = AbstractFieldError(:MyStruct, :myfield, Any)
+        buf = IOBuffer()
+        showerror(buf, err)
+        msg = String(take!(buf))
+        @test startswith(msg, "AbstractFieldError")
     end
 end
