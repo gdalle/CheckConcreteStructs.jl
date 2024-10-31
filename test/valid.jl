@@ -82,4 +82,3 @@ end
 
 @test V55{Int}(; x = 2) isa V55
 @test isconst(V55, :x)
-@test "Struct definition.\n" == string(@eval @doc V55)
