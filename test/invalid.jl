@@ -63,13 +63,13 @@ end
     y::Vector{Any}
 end
 
-@test_throws AbstractFieldError @eval Base.@kwdef @check_concrete mutable struct I26{T1}
+@test_throws AbstractFieldError @eval @check_concrete Base.@kwdef mutable struct I26{T1}
     const x::T1
     y::AbstractVector{Any} = []
     const z::Int = 3
 end
 
-@test_throws AbstractFieldError @eval Base.@kwdef @check_concrete mutable struct I27{T1}
+@test_throws AbstractFieldError @eval @check_concrete Base.@kwdef mutable struct I27{T1}
     const x::T1
     y::Vector{Any} = []
     const z::Real = 3

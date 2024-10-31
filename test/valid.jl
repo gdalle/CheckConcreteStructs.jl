@@ -74,7 +74,7 @@ end
 @test isconst(V54, :x)
 
 "Struct definition."
-Base.@kwdef @check_concrete mutable struct V55{T1}
+@check_concrete Base.@kwdef mutable struct V55{T1}
     const x::T1
     y::Vector{Any} = []
     const z::Int = 3
