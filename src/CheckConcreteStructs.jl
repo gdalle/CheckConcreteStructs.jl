@@ -1,20 +1,19 @@
 """
     CheckConcreteStructs
 
-Lightweight package to check that structs are defined with concrete fields.
+Lightweight package to check that types are defined with concrete fields.
 
 # Exports
 
+- [`all_concrete`](@ref)
 - [`@check_concrete`](@ref)
-- [`TypeNot`]
 """
 module CheckConcreteStructs
 
 using Base.Meta: isexpr
 
 export @check_concrete
-export check_concrete
-export AbstractFieldError
+export all_concrete
 
 function get_struct_name(struct_def::Expr)
     @assert isexpr(struct_def, :struct)
@@ -31,20 +30,14 @@ function get_struct_name(struct_def::Expr)
     return struct_def
 end
 
-"""
-    AbstractFieldError
-
-Exception thrown when [`@check_concrete`](@ref) detects a field without a concrete type. 
-"""
 struct AbstractFieldError <: Exception
     struct_name::Symbol
     field_name::Symbol
     field_type::Type
 end
 
-function Base.showerror(io::IO, exc::AbstractFieldError)
-    return print(
-        io,
+function Base.string(exc::AbstractFieldError)
+    return string(
         "AbstractFieldError in struct `",
         exc.struct_name,
         "`: field `",
@@ -55,44 +48,51 @@ function Base.showerror(io::IO, exc::AbstractFieldError)
     )
 end
 
+function Base.showerror(io::IO, exc::AbstractFieldError)
+    return print(io, string(exc))
+end
+
 """
     @check_concrete struct MyType
         # fields
     end
 
-Macro checking that every field in a struct has a concrete type.
+Check that every field of a struct definition is concretely typed, throw an error if that is not the case.
 
 # Examples
 
-Suppose you want to define a struct with a single field containing a vector of real numbers.
+Types with abstract fields:
 
-The following definitions will throw errors of type [`AbstractFieldError`](@ref):
+```jldoctest
+julia> using CheckConcreteStructs
 
-    @check_concrete struct BadType1
-        x
-    end
+julia> @check_concrete struct Bad1; x; end  # missing annotation
+ERROR: AbstractFieldError in struct `Bad1`: field `x` with declared type `Any` is not concretely typed.
 
-    @check_concrete struct BadType2
-        x::AbstractArray
-    end
+julia> @check_concrete struct Bad2; x::AbstractVector; end  # abstract container
+ERROR: AbstractFieldError in struct `Bad2`: field `x` with declared type `AbstractVector` is not concretely typed.
 
-    @check_concrete struct BadType3
-        x::Array{<:Real}
-    end
+julia> @check_concrete struct Bad3; x::Vector{<:Real}; end  # abstract element type
+ERROR: AbstractFieldError in struct `Bad3`: field `x` with declared type `Vector{<:Real}` is not concretely typed.
 
-The following definitions will execute without error:
+julia> @check_concrete struct Bad4; x::Array{Float64}; end  # not enough type parameters
+ERROR: AbstractFieldError in struct `Bad4`: field `x` with declared type `Array{Float64}` is not concretely typed.
+```
 
-    @check_concrete struct GoodType1
-        x::Vector{Float64}
-    end
+Types with only concrete fields:
 
-    @check_concrete struct GoodType2{T<:Real}
-        x::Vector{T}
-    end
+```jldoctest
+julia> using CheckConcreteStructs
 
-    @check_concrete struct GoodType3{T<:Real,V<:AbstractVector{T}}
-        x::V
-    end
+julia> @check_concrete struct Good1; x::Vector{Float64}; end
+true
+
+julia> @check_concrete struct Good2{T<:Real}; x::Vector{T}; end
+true
+
+julia> @check_concrete struct Good3{T<:Real,V<:AbstractVector{T}}; x::V; end
+true
+```
 """
 macro check_concrete(ex::Expr)
     if isexpr(ex, :macrocall)
@@ -102,30 +102,112 @@ macro check_concrete(ex::Expr)
     else
         struct_def = ex
     end
-    isexpr(struct_def, :struct) || throw(ArgumentError("Expected `struct` definition, got $struct_def"))
+    isexpr(struct_def, :struct) ||
+        throw(ArgumentError("Expected `struct` definition, got $struct_def"))
     struct_name = get_struct_name(struct_def)
     quote
         $(esc(ex))
-        check_concrete($(esc(struct_name)))
+        all_concrete_aux($(esc(struct_name)); throw_error=true, log_warning=false)
     end
 end
 
-function check_concrete(m::Module)
-    for name in names(m; all = true)
-        x = getproperty(m, name)
+"""
+    all_concrete(M::Module; verbose=true)
+
+Return `true` if every type defined inside the module `M` has only concretely-typed fields.
+
+If `verbose=true`, any field with an abstract type will display a warning.
+
+!!! warning
+    This function does not handle submodules yet.
+"""
+function all_concrete(M::Module; verbose::Bool=true)
+    concrete = true
+    for name in names(M; all=true)
+        x = getproperty(M, name)
         isa(x, Type) || continue
-        parentmodule(x) === m || continue
-        check_concrete(x)
-    end
-end
-
-check_concrete(T::UnionAll) = check_concrete(Base.unwrap_unionall(T))
-function check_concrete(T::Type)
-    for (field_name, field_type) in zip(fieldnames(T), fieldtypes(T))
-        if !recursive_isconcretetype(field_type)
-            throw(AbstractFieldError(nameof(T), field_name, field_type))
+        parentmodule(x) === M || continue
+        if !all_concrete(x; verbose)
+            concrete = false
         end
     end
+    return concrete
+end
+
+"""
+    all_concrete(T::Type; verbose=true)
+
+Return `true` if type `T` has only concretely-typed fields.
+
+If `verbose=true`, any field with an abstract type will display a warning.
+
+# Examples
+
+Types with abstract fields:
+
+```jldoctest
+julia> using CheckConcreteStructs
+
+julia> struct Bad1; x; end  # missing annotation
+
+julia> all_concrete(Bad1; verbose=false)
+false
+
+julia> struct Bad2; x::AbstractVector; end  # abstract container
+
+julia> all_concrete(Bad2; verbose=false)
+false
+
+julia> struct Bad3; x::Vector{<:Real}; end  # abstract element type
+
+julia> all_concrete(Bad3; verbose=false)
+false
+
+julia> struct Bad4; x::Array{Float64}; end  # not enough type parameters
+
+julia> all_concrete(Bad4; verbose=false)
+false
+```
+
+Types with only concrete fields:
+
+```jldoctest
+julia> using CheckConcreteStructs
+
+julia> struct Good1; x::Vector{Float64}; end
+
+julia> all_concrete(Good1)
+true
+
+julia> struct Good2{T<:Real}; x::Vector{T}; end
+
+julia> all_concrete(Good2)
+true
+
+julia> struct Good3{T<:Real,V<:AbstractVector{T}}; x::V; end
+
+julia> all_concrete(Good3)
+true
+```
+"""
+all_concrete(T; verbose::Bool=true) =
+    all_concrete_aux(T; throw_error=false, log_warning=verbose)
+
+function all_concrete_aux(T::UnionAll; throw_error::Bool, log_warning::Bool)
+    return all_concrete_aux(Base.unwrap_unionall(T); throw_error, log_warning)
+end
+
+function all_concrete_aux(T::Type; throw_error::Bool, log_warning::Bool)
+    concrete = true
+    for (field_name, field_type) in zip(fieldnames(T), fieldtypes(T))
+        if !recursive_isconcretetype(field_type)
+            concrete = false
+            exc = AbstractFieldError(nameof(T), field_name, field_type)
+            throw_error && throw(exc)
+            log_warning && @warn string(exc)
+        end
+    end
+    return concrete
 end
 
 function recursive_isconcretetype(T)

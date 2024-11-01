@@ -1,4 +1,5 @@
 using CheckConcreteStructs
+using CheckConcreteStructs: AbstractFieldError
 using Test
 
 ## Empty without type params
