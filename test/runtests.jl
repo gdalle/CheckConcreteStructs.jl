@@ -15,6 +15,21 @@ using Test
         include("invalid.jl")
     end
 
+    @testset "Checking modules" begin
+        m = @eval module $(gensym(:TestModule))
+            struct Good{T1}
+                x::T1
+                y::Vector{Any}
+            end
+
+            struct Bad{T1}
+                x::Real
+                y::Vector{T1}
+            end
+        end
+        @test_throws "in struct `Bad`: field `x`" check_concrete(m)
+    end
+
     @testset "Error display" begin
         err = AbstractFieldError(:MyStruct, :myfield, Any)
         buf = IOBuffer()

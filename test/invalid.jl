@@ -57,3 +57,20 @@ end
 @test_throws AbstractFieldError @check_concrete struct I24{T1}
     x::Union{T1, Int, Float32, Float64}
 end
+
+@test_throws AbstractFieldError @check_concrete mutable struct I25{T1}
+    const x::Real
+    y::Vector{Any}
+end
+
+@test_throws AbstractFieldError @eval @check_concrete Base.@kwdef mutable struct I26{T1}
+    const x::T1
+    y::AbstractVector{Any} = []
+    const z::Int = 3
+end
+
+@test_throws AbstractFieldError @eval @check_concrete Base.@kwdef mutable struct I27{T1}
+    const x::T1
+    y::Vector{Any} = []
+    const z::Real = 3
+end

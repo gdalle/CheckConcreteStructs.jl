@@ -13,6 +13,7 @@ module CheckConcreteStructs
 using Base.Meta: isexpr
 
 export @check_concrete
+export check_concrete
 export AbstractFieldError
 
 function get_struct_name(struct_def::Expr)
@@ -93,34 +94,37 @@ The following definitions will execute without error:
         x::V
     end
 """
-macro check_concrete(struct_def::Expr)
-    @assert isexpr(struct_def, :struct)
-    struct_name = get_struct_name(struct_def)
-    block = struct_def.args[3]
-    @assert isexpr(block, :block)
-    for (i, arg) in enumerate(block.args)
-        isexpr(arg, :(::)) || isa(arg, Symbol) || continue
-        if isa(arg, Symbol)
-            field_name, field_type, instant_err = arg, :Any, true
-        else
-            field_name, field_type, instant_err = arg.args[1], arg.args[2], false
-        end
-        new_field_type = :($check_concrete_field(
-            $field_type,
-            $(QuoteNode(field_name)),
-            $(QuoteNode(struct_name)),
-            $instant_err,
-        ))
-        block.args[i] = Expr(:(::), field_name, new_field_type)
+macro check_concrete(ex::Expr)
+    if isexpr(ex, :macrocall)
+        i = findfirst(x -> isexpr(x, :struct), ex.args)
+        isnothing(i) && throw(ArgumentError("Expected `struct` definition, got $ex"))
+        struct_def = ex.args[i]
+    else
+        struct_def = ex
     end
-    return esc(struct_def)
+    isexpr(struct_def, :struct) || throw(ArgumentError("Expected `struct` definition, got $struct_def"))
+    struct_name = get_struct_name(struct_def)
+    quote
+        $(esc(ex))
+        check_concrete($(esc(struct_name)))
+    end
 end
 
-function check_concrete_field(field_type, field_name, struct_name, instant_err)
-    if instant_err || !recursive_isconcretetype(field_type)
-        throw(AbstractFieldError(struct_name, field_name, field_type))
-    else
-        return field_type
+function check_concrete(m::Module)
+    for name in names(m; all = true)
+        x = getproperty(m, name)
+        isa(x, Type) || continue
+        parentmodule(x) === m || continue
+        check_concrete(x)
+    end
+end
+
+check_concrete(T::UnionAll) = check_concrete(Base.unwrap_unionall(T))
+function check_concrete(T::Type)
+    for (field_name, field_type) in zip(fieldnames(T), fieldtypes(T))
+        if !recursive_isconcretetype(field_type)
+            throw(AbstractFieldError(nameof(T), field_name, field_type))
+        end
     end
 end
 
