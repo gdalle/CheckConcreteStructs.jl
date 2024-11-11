@@ -126,6 +126,8 @@ function all_concrete(M::Module; verbose::Bool=true)
     for name in names(M; all=true)
         x = getproperty(M, name)
         isa(x, Type) || continue
+        isa(x, Union) && continue
+        isabstracttype(x) && continue
         parentmodule(x) === M || continue
         if !all_concrete(x; verbose)
             concrete = false
