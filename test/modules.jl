@@ -32,3 +32,10 @@ end
     :warn,
     "AbstractFieldError in struct `Bad`: field `x` with declared type `Real` is not concretely typed.",
 ) !all_concrete(M2)
+
+M3 = @eval module $(gensym(:TestModule))
+abstract type DontCheckMe end
+TypeAlias = Union{Int, Float64}
+end
+
+@test all_concrete(M3; verbose=false)
