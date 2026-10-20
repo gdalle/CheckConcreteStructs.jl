@@ -60,6 +60,14 @@ end
     x::Union{T1, Int, Float64}
 end
 
+@check_concrete struct V61{N}
+    x::NTuple{N,Int}
+end
+
+@check_concrete struct V62{N,T}
+    x::Tuple{Int,Vararg{Vector{T},N}}
+end
+
 @check_concrete mutable struct V53{T1}
     const x::T1
     y::Vector{Any}

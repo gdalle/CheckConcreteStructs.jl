@@ -221,6 +221,12 @@ function recursive_isconcretetype(T)
         subTs = Base.uniontypes(T)
         # If inference will give up on this union, report as `false`.
         length(subTs) > Core.Compiler.MAX_TYPEUNION_LENGTH && return false
+    elseif Base.isvatuple(T)
+        # `fieldtypes` throws on these. A length bound by a type parameter
+        # (`NTuple{N,Int}`) is concrete once `N` is known; an unbounded one is not.
+        va = last(T.parameters)
+        isdefined(va, :N) || return false
+        subTs = (T.parameters[1:(end - 1)]..., Base.unwrapva(va))
     else
         subTs = fieldtypes(T)
     end

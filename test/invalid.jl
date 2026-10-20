@@ -74,3 +74,11 @@ end
     y::Vector{Any} = []
     const z::Real = 3
 end
+
+@test_throws "field `x`" @check_concrete struct I31{N}
+    x::NTuple{N,Integer}
+end
+
+@test_throws "field `x`" @check_concrete struct I32
+    x::Tuple{Vararg{Int}}
+end
