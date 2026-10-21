@@ -16,13 +16,13 @@ struct Bad
 end
 end
 
-struct SingletonHeader
+struct TypeUnionField
     datatype::Union{Type{UInt32},Type{UInt64}}
 end
-struct SingletonParameter{T}
+struct TypeParameterField{T}
     datatype::Type{T}
 end
-struct SingletonAbstractType
+struct AbstractTypeField
     datatype::Type{Real}
 end
 struct UnrestrictedType
@@ -47,11 +47,11 @@ end
     @test !all_concrete(ParametricAliasesWithAbstractField; verbose=false)
 end
 
-@testset "Singleton type fields" begin
-    @test all_concrete(SingletonHeader)
-    @test all_concrete(SingletonParameter)
-    @test all_concrete(SingletonParameter{UInt32})
-    @test all_concrete(SingletonAbstractType)
+@testset "Type fields" begin
+    @test !all_concrete(TypeUnionField; verbose=false)
+    @test !all_concrete(TypeParameterField; verbose=false)
+    @test !all_concrete(TypeParameterField{UInt32}; verbose=false)
+    @test !all_concrete(AbstractTypeField; verbose=false)
     @test !all_concrete(UnrestrictedType; verbose=false)
     @test !all_concrete(OpenTypeFamily; verbose=false)
 end
