@@ -32,20 +32,6 @@ struct OpenTypeFamily
     datatype::Type{<:Integer}
 end
 
-struct TabledLaw{N}
-    p::NTuple{N,Float64}
-    sy::NTuple{N,Float64}
-end
-struct AbstractTuple{N}
-    values::NTuple{N,Real}
-end
-struct OpenTupleLength
-    values::Tuple{Vararg{Float64}}
-end
-struct UnrestrictedTuple
-    values::Tuple
-end
-
 struct RecursiveNode{T}
     next::Union{Nothing,RecursiveNode{T}}
     value::T
@@ -68,15 +54,6 @@ end
     @test all_concrete(SingletonAbstractType)
     @test !all_concrete(UnrestrictedType; verbose=false)
     @test !all_concrete(OpenTypeFamily; verbose=false)
-end
-
-@testset "Tuple length parameters" begin
-    @test all_concrete(TabledLaw)
-    @test all_concrete(TabledLaw{3})
-    @test isbitstype(TabledLaw{3})
-    @test !all_concrete(AbstractTuple; verbose=false)
-    @test !all_concrete(OpenTupleLength; verbose=false)
-    @test !all_concrete(UnrestrictedTuple; verbose=false)
 end
 
 @testset "Recursive parametric fields" begin

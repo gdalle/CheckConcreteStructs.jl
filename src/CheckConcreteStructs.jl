@@ -217,12 +217,6 @@ recursive_isconcretetype(T) = recursive_isconcretetype(T, Set{Any}())
 function recursive_isconcretetype(T, seen::Set{Any})
     isa(T, UnionAll) && return false
     isa(T, TypeVar) && return true  # key modification
-    if isa(T, Core.TypeofVararg)
-        # An enclosing struct's length parameter becomes fixed when instantiated.
-        # A Vararg without a length still permits tuples of arbitrary size.
-        isdefined(T, :N) || return false
-        return recursive_isconcretetype(T.T, seen)
-    end
     isconcretetype(T) && return true
     # Type{X} has at most one possible value, even though Julia classifies it as
     # abstract. Open families such as Type{<:Real} were rejected as UnionAll above.
@@ -237,9 +231,12 @@ function recursive_isconcretetype(T, seen::Set{Any})
         subTs = Base.uniontypes(T)
         # If inference will give up on this union, report as `false`.
         length(subTs) > Core.Compiler.MAX_TYPEUNION_LENGTH && return false
-    elseif isa(T, DataType) && T <: Tuple
-        # fieldtypes cannot enumerate NTuple{N,T} before N is instantiated.
-        subTs = T.parameters
+    elseif Base.isvatuple(T)
+        # `fieldtypes` throws on these. A length bound by a type parameter
+        # (`NTuple{N,Int}`) is concrete once `N` is known; an unbounded one is not.
+        va = last(T.parameters)
+        isdefined(va, :N) || return false
+        subTs = (T.parameters[1:(end - 1)]..., Base.unwrapva(va))
     else
         subTs = fieldtypes(T)
     end
