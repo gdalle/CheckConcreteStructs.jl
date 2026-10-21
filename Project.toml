@@ -1,7 +1,7 @@
 name = "CheckConcreteStructs"
 uuid = "73c92db5-9da6-4938-911a-6443a7e94a58"
 authors = ["Guillaume Dalle", "Cédric Belmant"]
-version = "0.1.0"
+version = "0.1.1"
 
 [compat]
 julia = "1.10"
