@@ -126,7 +126,7 @@ function all_concrete(M::Module; verbose::Bool=true)
     for name in names(M; all=true)
         x = getproperty(M, name)
         isa(x, Type) || continue
-        isa(x, Union) && continue
+        isa(Base.unwrap_unionall(x), Union) && continue
         isabstracttype(x) && continue
         parentmodule(x) === M || continue
         if !all_concrete(x; verbose)
@@ -212,11 +212,25 @@ function all_concrete_aux(T::Type; throw_error::Bool, log_warning::Bool)
     return concrete
 end
 
-function recursive_isconcretetype(T)
+recursive_isconcretetype(T) = recursive_isconcretetype(T, Set{Any}())
+
+function recursive_isconcretetype(T, seen::Set{Any})
+    T === Union{} && return false
     isa(T, UnionAll) && return false
     isa(T, TypeVar) && return true  # key modification
     isconcretetype(T) && return true
+    # Check Type{X} by the same rules as X: allow struct parameters and concrete
+    # types, but reject abstract types such as Real. Open families such as
+    # Type{<:Real} were rejected as UnionAll above.
+    if isa(T, DataType) && T.name === Base.unwrap_unionall(Type).name
+        return recursive_isconcretetype(only(T.parameters), seen)
+    end
     isabstracttype(T) && return false
+    # A recursive parametric field can lead back to a type whose remaining fields
+    # are already being checked. Traverse each type once, without skipping those
+    # remaining fields (which may still be abstract).
+    T in seen && return true
+    push!(seen, T)
     if isa(T, Union)
         subTs = Base.uniontypes(T)
         # If inference will give up on this union, report as `false`.
@@ -231,7 +245,7 @@ function recursive_isconcretetype(T)
         subTs = fieldtypes(T)
     end
     for subT in subTs
-        recursive_isconcretetype(subT) || return false
+        recursive_isconcretetype(subT, seen) || return false
     end
     return true
 end

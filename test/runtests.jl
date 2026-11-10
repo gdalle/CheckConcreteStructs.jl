@@ -30,6 +30,10 @@ using Test
         include("modules.jl")
     end
 
+    @testset "Reflection edge cases" begin
+        include("reflection.jl")
+    end
+
     @testset "Error display" begin
         err = AbstractFieldError(:MyStruct, :myfield, Any)
         buf = IOBuffer()
